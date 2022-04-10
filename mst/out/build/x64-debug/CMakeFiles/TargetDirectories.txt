@@ -1,0 +1,3 @@
+C:/Users/caioj/Desktop/Jordan/France/X/2A_21_22/P3/INF442/minimum-spanning-trees/mst/out/build/x64-debug/CMakeFiles/mst.dir
+C:/Users/caioj/Desktop/Jordan/France/X/2A_21_22/P3/INF442/minimum-spanning-trees/mst/out/build/x64-debug/CMakeFiles/edit_cache.dir
+C:/Users/caioj/Desktop/Jordan/France/X/2A_21_22/P3/INF442/minimum-spanning-trees/mst/out/build/x64-debug/CMakeFiles/rebuild_cache.dir
