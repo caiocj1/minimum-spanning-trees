@@ -24,7 +24,7 @@ void Graph::print()
 {
 	for (int i = 0; i < n; i++)
 	{
-		std::cout << i << " connected to: ";
+		std::cout << i << " -> ";
 		for (auto p = adj[i].begin(); p != adj[i].end(); p++)
 		{
 			std::cout << "(" << p->first << ", " << p->second << ") ";
@@ -45,8 +45,10 @@ void Graph::add_bi_edge(int u, int v, float w)
 			p->second = w;
 			for (auto q = adj[v].begin(); q != adj[v].end(); q++)
 				if (q->first == u)
+				{
 					q->second = w;
-			return;
+					return;
+				}
 		}
 
 	adj[u].push_back(std::make_pair(v, w));
