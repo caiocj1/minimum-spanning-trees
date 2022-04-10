@@ -1,10 +1,12 @@
 #pragma once
 #include <list>
 
+typedef std::pair<int, float> edge;
+
 class Graph
 {
 	int n;
-	std::list<std::pair<int, float>>* adj;
+	std::list<edge>* adj;
 public:
 	Graph(int n_);
 	~Graph();
@@ -14,4 +16,6 @@ public:
 	void print();
 
 	void add_bi_edge(int u, int v, float w);
+
+	Graph* prim();
 };
