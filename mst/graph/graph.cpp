@@ -1,4 +1,5 @@
 #include "graph.h"
+#include "union_find.hpp"
 #include <stdexcept>
 #include <iostream>
 #include <queue>
@@ -7,6 +8,7 @@
 Graph::Graph(int n_)
 {
 	n = n_;
+	m = 0;
 	adj = new std::list<edge>[n_];
 }
 
@@ -33,7 +35,7 @@ void Graph::print()
 	}
 }
 
-void Graph::add_bi_edge(int u, int v, float w)
+void Graph::add_bi_edge(int u, int v, double w)
 {
 	if (u < 0 || u >= n || v < 0 || v >= n || w <= 0)
 		throw std::invalid_argument(
@@ -53,18 +55,19 @@ void Graph::add_bi_edge(int u, int v, float w)
 
 	adj[u].push_back(std::make_pair(v, w));
 	adj[v].push_back(std::make_pair(u, w));
+	m++;
 }
 
 Graph* Graph::prim()
 {
 	Graph* mst = new Graph(n);
 
-	float inf = std::numeric_limits<float>::infinity();
+	double inf = std::numeric_limits<double>::infinity();
 
 	auto cmp = [](edge e1, edge e2) { return e1.second > e2.second; };
 	std::priority_queue<edge, std::vector<edge>, decltype(cmp)> q(cmp);
 
-	std::vector<float> key(n, inf);
+	std::vector<double> key(n, inf);
 	std::vector<int> parent(n, -1);
 	std::vector<bool> inMST(n, false);
 
@@ -84,7 +87,7 @@ Graph* Graph::prim()
 		for (auto p = adj[u].begin(); p != adj[u].end(); p++)
 		{
 			int v = p->first;
-			float w = p->second;
+			double w = p->second;
 
 			if (!inMST[v] && key[v] > w)
 			{
@@ -99,4 +102,27 @@ Graph* Graph::prim()
 		mst->add_bi_edge(i, parent[i], key[i]);
 
 	return mst;
+}
+
+Graph* Graph::kruskal(){
+	Graph* mst = new Graph(n);
+	
+	std::vector<bi_edge> edge_list;
+
+	for(int i = 0; i < n; i++)
+		for(auto &[v, w] : adj[i])
+			edge_list.push_back({w, v, i});
+		
+	sort(edge_list.begin(), edge_list.end());
+
+	UnionFind components(n);
+
+	for(auto &[w, u, v] : edge_list){
+		if(components.isSameClass(u, v)) continue;
+		
+		mst->add_bi_edge(u, v, w);
+		components.unionClass(u, v);
+		if(components.getNumSets() == 1) break;
+	}
+	
 }
