@@ -9,7 +9,7 @@ Graph::Graph(int n_)
 {
 	n = n_;
 	m = 0;
-	adj = new std::list<edge>[n_];
+	adj = new std::set<edge>[n_];
 }
 
 Graph::~Graph()
@@ -27,9 +27,9 @@ void Graph::print()
 	for (int i = 0; i < n; i++)
 	{
 		std::cout << i << " -> ";
-		for (auto p = adj[i].begin(); p != adj[i].end(); p++)
+		for (auto &[v, w] : adj[i])
 		{
-			std::cout << "(" << p->first << ", " << p->second << ") ";
+			std::cout << "(" << v << ", " << w << ") ";
 		}
 		std::cout << std::endl;
 	}
@@ -41,36 +41,46 @@ void Graph::add_bi_edge(int u, int v, double w)
 		throw std::invalid_argument(
 			"Vertices must be in [0, n[ and weight must be strictly positive");
 
-	for (auto p = adj[u].begin(); p != adj[u].end(); p++)
-		if (p->first == v)
-		{
-			p->second = w;
-			for (auto q = adj[v].begin(); q != adj[v].end(); q++)
-				if (q->first == u)
-				{
-					q->second = w;
-					return;
-				}
-		}
+	double neg_inf = std::numeric_limits<double>::min();
+	
+	// Check if edge is already in graph, remove if so
+	auto u_to_v = adj[u].lower_bound(std::make_pair(v, neg_inf));
+	if (u_to_v != adj[u].end() and u_to_v->first == v)
+	{
+		adj[u].erase(*u_to_v);
+		m--;
+	}
+		
+	auto v_to_u = adj[v].lower_bound(std::make_pair(u, neg_inf));
+	if (v_to_u != adj[v].end() and v_to_u->first == u)
+	{
+		adj[v].erase(*v_to_u);
+		m--;
+	}	
 
-	adj[u].push_back(std::make_pair(v, w));
-	adj[v].push_back(std::make_pair(u, w));
-	m++;
+	// Add edge with new_weight
+	adj[u].insert(std::make_pair(v, w));
+	adj[v].insert(std::make_pair(u, w));
+	m += 2;
 }
 
 Graph* Graph::prim()
 {
 	Graph* mst = new Graph(n);
 
-	double inf = std::numeric_limits<double>::infinity();
+	// Define infinity
+	constexpr double inf = std::numeric_limits<double>::infinity();
 
+	// Declare priority queue
 	auto cmp = [](edge e1, edge e2) { return e1.second > e2.second; };
 	std::priority_queue<edge, std::vector<edge>, decltype(cmp)> q(cmp);
 
+	// Auxiliary vectors
 	std::vector<double> key(n, inf);
 	std::vector<int> parent(n, -1);
 	std::vector<bool> inMST(n, false);
 
+	// Prim algorithm
 	q.push(std::make_pair(0, 0));
 	key[0] = 0;
 
@@ -81,14 +91,10 @@ Graph* Graph::prim()
 
 		if (inMST[u])
 			continue;
-
 		inMST[u] = true;
 
-		for (auto p = adj[u].begin(); p != adj[u].end(); p++)
+		for (auto& [v, w] : adj[u])
 		{
-			int v = p->first;
-			double w = p->second;
-
 			if (!inMST[v] && key[v] > w)
 			{
 				key[v] = w;
@@ -125,4 +131,5 @@ Graph* Graph::kruskal(){
 		if(components.getNumSets() == 1) break;
 	}
 	
+	return mst;
 }

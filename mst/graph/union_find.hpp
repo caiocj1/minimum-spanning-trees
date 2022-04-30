@@ -23,7 +23,7 @@ public:
 
     bool isSameClass(int i, int j) { return find(i) == find(j);}
     int getNumSets() { return numSets; }
-    int sizeOfClass(int i) { setSize[find(i)];}
+    int sizeOfClass(int i) { return setSize[find(i)];}
 
     void unionClass(int i, int j){
         if(isSameClass(i, j)) return;
