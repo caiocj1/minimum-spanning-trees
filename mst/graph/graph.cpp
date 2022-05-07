@@ -133,3 +133,57 @@ Graph* Graph::kruskal(){
 	
 	return mst;
 }
+
+Graph* Graph::boruvska()
+{
+	Graph* mst = new Graph(n);
+
+	std::vector<bi_edge> cheapest(n, std::make_tuple(-1, -1, -1));
+	
+	std::vector<bi_edge> edge_list;
+	for (int i = 0; i < n; i++)
+		for (auto& [v, w] : adj[i])
+			edge_list.push_back({ w, v, i });
+
+	UnionFind components(n);
+
+	bool completed = false;
+	while (!completed)
+	{
+		for (auto& [w, u, v] : edge_list)
+		{
+			int set1 = components.find(u);
+			int set2 = components.find(v);
+
+			if (set1 != set2)
+			{
+				if (std::get<1>(cheapest[set1]) == -1 or std::get<0>(cheapest[set1]) > w)
+					cheapest[set1] = std::make_tuple(w, u, v);
+				if (std::get<1>(cheapest[set2]) == -1 or std::get<0>(cheapest[set2]) > w)
+					cheapest[set2] = std::make_tuple(w, u, v);
+			}
+		}
+
+		for (int i = 0; i < n; i++)
+		{
+			if (std::get<1>(cheapest[i]) != -1)
+			{
+				auto& [w, u, v] = cheapest[i];
+				int set1 = components.find(u);
+				int set2 = components.find(v);
+
+				if (set1 != set2)
+				{
+					components.unionClass(set1, set2);
+					mst->add_bi_edge(u, v, w);
+					if (components.getNumSets() == 1) completed = true;
+				}
+			}
+		}
+
+		cheapest = std::vector<bi_edge>(n, std::make_tuple(-1, -1, -1));
+
+	}
+
+	return mst;
+}

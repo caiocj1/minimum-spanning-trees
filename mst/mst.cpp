@@ -18,7 +18,7 @@ int main()
 
 	std::cout << std::endl;
 
-	Graph* test = g.kruskal();
+	Graph* test = g.boruvska();
 	std::cout << "MST:" << std::endl;
 	test->print();
 

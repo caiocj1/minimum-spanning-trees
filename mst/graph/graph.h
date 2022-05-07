@@ -20,8 +20,6 @@ public:
 	void add_bi_edge(int u, int v, double w);
 
 	Graph* prim();
-
 	Graph* boruvska();
-
 	Graph* kruskal();
 };
