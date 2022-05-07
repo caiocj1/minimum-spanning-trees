@@ -1,6 +1,7 @@
 #pragma once
 #include <set>
 #include <tuple>
+#include <vector>
 
 typedef std::pair<int, double> edge;
 typedef std::tuple<double, int, int> bi_edge;
@@ -14,6 +15,7 @@ public:
 	~Graph();
 
 	int get_n();
+	std::set<edge>* get_adj();
 
 	void print();
 
@@ -22,4 +24,6 @@ public:
 	Graph* prim();
 	Graph* boruvska();
 	Graph* kruskal();
+
+	std::vector<int> mst_clustering(int k);
 };

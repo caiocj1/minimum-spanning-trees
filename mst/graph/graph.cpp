@@ -4,6 +4,7 @@
 #include <iostream>
 #include <queue>
 #include <limits>
+#include <assert.h>
 
 Graph::Graph(int n_)
 {
@@ -37,9 +38,7 @@ void Graph::print()
 
 void Graph::add_bi_edge(int u, int v, double w)
 {
-	if (u < 0 || u >= n || v < 0 || v >= n || w <= 0)
-		throw std::invalid_argument(
-			"Vertices must be in [0, n[ and weight must be strictly positive");
+	assert(! (u < 0 || u >= n || v < 0 || v >= n || w <= 0));
 
 	double neg_inf = std::numeric_limits<double>::min();
 	
@@ -134,6 +133,11 @@ Graph* Graph::kruskal(){
 	return mst;
 }
 
+/**
+* Boruvska's algorithm to calculate MST.
+* 
+* @return: pointer to MST
+*/
 Graph* Graph::boruvska()
 {
 	Graph* mst = new Graph(n);
@@ -180,10 +184,58 @@ Graph* Graph::boruvska()
 				}
 			}
 		}
-
 		cheapest = std::vector<bi_edge>(n, std::make_tuple(-1, -1, -1));
-
 	}
 
 	return mst;
+}
+
+/**
+* Getter of adjacency list.
+* 
+* @return: adjacency list of graph
+*/
+std::set<edge>* Graph::get_adj()
+{
+	return adj;
+}
+
+/**
+* Uses Kruskal's algorithm to calculate MST,
+* then removes k - 1 heaviest edges in order
+* to have k clusters.
+* 
+* @param: number of clusters k
+* @return: vector with cluster of vertex
+*/
+std::vector<int> Graph::mst_clustering(int k)
+{
+	// Check if valid k
+	assert(1 <= k and k <= n);
+
+	std::vector<int> res(n, -1);
+
+	// Get MST from Kruskal's
+	Graph* mst = kruskal();
+	std::set<edge>* mst_adj = mst->get_adj();
+
+	// Get and sort bi_edges by weight
+	std::vector<bi_edge> edge_list;
+	for (int i = 0; i < n; i++)
+		for (auto& [v, w] : mst_adj[i])
+			edge_list.push_back({ w, v, i });
+	sort(edge_list.begin(), edge_list.end());
+
+	// Assign clusters
+	UnionFind components(n);
+	for (int i = 0; i < n - k; i++)
+	{
+		auto& [w, u, v] = edge_list[i];
+		components.unionClass(u, v);
+	}
+
+	// Fill and return result
+	for (int i = 0; i < n; i++)
+		res[i] = components.find(i);
+	return res;
 }
