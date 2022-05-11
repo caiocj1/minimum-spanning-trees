@@ -5,7 +5,7 @@
 
 void task1()
 {
-	Graph* g = Graph::random_complete_graph(1000);
+	Graph* g = Graph::random_complete_graph(3000);
 
 	std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
 	Graph* mst = g->prim();
@@ -24,6 +24,18 @@ void task1()
 	delete mst;
 
 	delete g;
+}
+
+void task6()
+{
+	Dataset test("../data/test_data.csv");
+	test.print();
+	std::cout << "--------------" << std::endl;
+	test.rescale();
+	test.print();
+	std::cout << "--------------" << std::endl;
+	test.standardize();
+	test.print();
 }
 
 
@@ -75,6 +87,9 @@ int main()
 		{
 		case 1:
 			task1();
+			break;
+		case 6:
+			task6();
 			break;
 		default:
 			valid = false;
