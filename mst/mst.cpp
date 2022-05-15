@@ -5,7 +5,7 @@
 
 void task1()
 {
-	Graph* g = Graph::random_complete_graph(3000);
+	Graph* g = Graph::random_complete_graph(500);
 
 	std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
 	Graph* mst = g->prim();
@@ -28,14 +28,11 @@ void task1()
 
 void task6()
 {
-	Dataset test("../data/test_data.csv");
-	test.print();
-	std::cout << "--------------" << std::endl;
-	test.rescale();
-	test.print();
-	std::cout << "--------------" << std::endl;
-	test.standardize();
-	test.print();
+	Dataset test("../data/rio_airbnb_listings.csv");
+	
+	std::cout << test.get_n() << " " << test.get_d();
+
+	Graph g(test, "standardize");
 }
 
 

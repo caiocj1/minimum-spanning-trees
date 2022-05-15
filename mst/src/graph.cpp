@@ -14,10 +14,26 @@ Graph::Graph(int n_)
 	adj = new std::set<edge>[n_];
 }
 
-Graph::Graph(Dataset data, std::string normalize = "none")
+Graph::Graph(Dataset data, std::string normalize)
 {
 	n = data.get_n();
+	adj = new std::set<edge>[n];
+	m = 0;
 
+	if (normalize == "standardize")
+		data.standardize();
+	else if (normalize == "rescale")
+		data.rescale();
+
+	for (int i = 0; i < n; i++)
+	{
+		std::vector<double> x_i = data.get_instance(i);
+		for (int j = i + 1; j < n; j++)
+		{
+			std::vector<double> x_j = data.get_instance(j);
+			add_bi_edge(i, j, Dataset::dist(x_i, x_j));
+		}
+	}
 }
 
 Graph::~Graph()

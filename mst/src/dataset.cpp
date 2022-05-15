@@ -5,6 +5,7 @@
 #include <iostream>
 #include <sstream>
 #include <cmath>
+#include <cstdlib>
 
 /**
 * Returns dataset with specified size and dimensions,
@@ -13,6 +14,13 @@
 * @param: number n of points, number d of dimensions
 */
 Dataset::Dataset(int n_, int d_) : n(n_), d(d_), data(n_, std::vector<double>(d, 0)) { };
+
+bool is_number(const std::string& s)
+{
+	char* end = nullptr;
+	double val = strtod(s.c_str(), &end);
+	return end != s.c_str() && *end == '\0' && val != HUGE_VAL;
+}
 
 Dataset::Dataset(std::string filename)
 {
@@ -31,7 +39,8 @@ Dataset::Dataset(std::string filename)
 
 		std::stringstream str(line);
 		while (std::getline(str, entry, ','))
-			row.push_back(std::stod(entry));
+			if(is_number(entry))
+				row.push_back(std::stod(entry));
 
 		data.push_back(row);
 	}
@@ -106,23 +115,15 @@ void Dataset::standardize()
 	std::vector<double> std_err(d, 0);
 
 	for (int j = 0; j < d; j++)
-	{
-		double sum = 0;
-
 		for (int i = 0; i < n; i++)
-			sum += data[i][j];
-
-		avg[j] = sum / n;
-	}
+			avg[j] += data[i][j] / (double)n;
 
 	for (int j = 0; j < d; j++)
 	{
-		double sum = 0;
-
 		for (int i = 0; i < n; i++)
-			sum += (data[i][j] - avg[j]) * (data[i][j] - avg[j]);
+			std_err[j] += (data[i][j] - avg[j]) * (data[i][j] - avg[j]) / (double)n;
 
-		std_err[j] = std::sqrt(sum / n);
+		std_err[j] = std::sqrt(std_err[j]);
 	}
 
 	for (int j = 0; j < d; j++)
