@@ -16,6 +16,8 @@ public:
 
 	static double dist(std::vector<double> d1, std::vector<double> d2);
 
+	std::vector<int> k_means(int k);
+
 	void print();
 
 	void rescale();

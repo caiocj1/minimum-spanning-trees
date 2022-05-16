@@ -7,9 +7,9 @@ void task1()
 {
 	Graph* g = Graph::random_complete_graph(500);
 
-	std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
+	auto begin = std::chrono::steady_clock::now();
 	Graph* mst = g->prim();
-	std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
+	auto end = std::chrono::steady_clock::now();
 	auto dif = std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count();
 	std::cout << "Prim time    : " << dif << " [ms]" << std::endl;
 
@@ -26,13 +26,45 @@ void task1()
 	delete g;
 }
 
+void task5()
+{
+	// Imports sample dataset that consists in 400 points
+	// taken from two gaussian distributions
+	Dataset compare("../data/compare.csv");
+	
+	// Measure time of k-means
+	auto begin = std::chrono::steady_clock::now();
+
+	// Performs k-means with Forgy initialization
+	std::vector<int> labels_kmeans = compare.k_means(2);
+
+	auto end = std::chrono::steady_clock::now();
+	auto dif = std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count();
+
+	std::cout << "k-means time: " << dif << " [microseg]" << std::endl;
+
+	// Creates complete graph from same dataset
+	Graph g(compare);
+
+	// Measures time for MST clustering
+	begin = std::chrono::steady_clock::now();
+	
+	// Performs MST clustering
+	std::vector<int> labels_mst = g.mst_cluster(2);
+
+	end = std::chrono::steady_clock::now();
+	dif = std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count();
+
+	std::cout << "MST time    : " << dif << " [ms]" << std::endl;
+}
+
 void task6()
 {
 	Dataset test("../data/rio_airbnb_listings.csv");
 	
 	std::cout << test.get_n() << " " << test.get_d();
 
-	Graph g(test, "standardize");
+	//Graph g(test, "standardize");
 }
 
 
@@ -84,6 +116,9 @@ int main()
 		{
 		case 1:
 			task1();
+			break;
+		case 5:
+			task5();
 			break;
 		case 6:
 			task6();

@@ -1,4 +1,5 @@
 #include "dataset.hpp"
+#include "kmeans.hpp"
 #include <assert.h>
 #include <algorithm>
 #include <fstream>
@@ -83,6 +84,20 @@ double Dataset::dist(std::vector<double> d1, std::vector<double> d2)
 	for (int i = 0; i < d1.size(); i++)
 		sum += (d1[i] - d2[i]) * (d1[i] - d2[i]);
 	return std::sqrt(sum);
+}
+
+
+std::vector<int> Dataset::k_means(int k)
+{
+	cloud helper(data, d, n, k);
+
+	helper.lloyd();
+	
+	std::vector<int> labels(n, 0);
+	for (int i = 0; i < n; i++)
+		labels[i] = helper.get_point(i).label;
+
+	return labels;
 }
 
 void Dataset::rescale()

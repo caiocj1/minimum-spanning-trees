@@ -269,7 +269,7 @@ std::vector<int> Graph::mst_cluster(int k)
 
 	// Assign clusters
 	UnionFind components(n);
-	for (int i = 0; i < n - k; i++)
+	for (int i = 0; i < edge_list.size() - 2 * k + 1; i++)
 	{
 		auto& [w, u, v] = edge_list[i];
 		components.unionClass(u, v);
