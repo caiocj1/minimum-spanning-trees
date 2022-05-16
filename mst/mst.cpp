@@ -28,9 +28,10 @@ void task1()
 
 void task5()
 {
-	// Imports sample dataset that consists in 400 points
-	// taken from two gaussian distributions
-	Dataset compare("../data/compare.csv");
+	// Imports sample dataset that consists in points
+	// taken from three gaussian distributions.
+	// Change to 600, 900, 1200, 1500 to get time dependance
+	Dataset compare("../data/compare_3clusters_300.csv");
 	
 	// Measure time of k-means
 	auto begin = std::chrono::steady_clock::now();
