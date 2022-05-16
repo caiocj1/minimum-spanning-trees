@@ -269,7 +269,7 @@ std::vector<int> Graph::mst_cluster(int k)
 
 	// Assign clusters
 	UnionFind components(n);
-	for (int i = 0; i < edge_list.size() - 2 * k + 1; i++)
+	for (int i = 0; i < edge_list.size() - 2 * k + 2; i++)
 	{
 		auto& [w, u, v] = edge_list[i];
 		components.unionClass(u, v);
@@ -293,24 +293,31 @@ std::vector<int> Graph::mst_cluster(int k)
 */
 std::vector<int> Graph::mst_cluster()
 {
-	for (int k = 1; k <= n; k++)
+	std::vector<double> weights;
+	for (int k = 1; k <= (int)std::log10(n); k++)
 	{
-		double intra = 0;
+		Graph* mst = kruskal();
 		std::vector<int> clusters = mst_cluster(k);
 
+		double total_w = 0;
+		std::vector<bool> checked(n, false);
 		for (int i = 0; i < n; i++)
 		{
-
-			for (auto& [v, w] : adj[i])
-			{
-				if (clusters[v] == clusters[i])
+			for(auto &[v, w] : mst->adj[i])
+				if (clusters[v] == clusters[i] && !checked[v])
 				{
-
+					checked[v] = true;
+					total_w += w;
 				}
-					
-			}
 		}
+
+		weights.push_back(total_w);
+
+		delete mst;
 	}
+
+	auto it = std::min_element(std::begin(weights), std::end(weights));
+	int k_opt = 1 + std::distance(std::begin(weights), it);
 	
-	return std::vector<int>(n, 0);
+	return mst_cluster(k_opt);
 }

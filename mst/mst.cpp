@@ -31,13 +31,13 @@ void task5()
 	// Imports sample dataset that consists in points
 	// taken from three gaussian distributions.
 	// Change to 600, 900, 1200, 1500 to get time dependance
-	Dataset compare("../data/compare_3clusters_300.csv");
+	Dataset compare("../data/compare_3clusters_600.csv");
 	
 	// Measure time of k-means
 	auto begin = std::chrono::steady_clock::now();
 
 	// Performs k-means with Forgy initialization
-	std::vector<int> labels_kmeans = compare.k_means(2);
+	std::vector<int> labels_kmeans = compare.k_means(3);
 
 	auto end = std::chrono::steady_clock::now();
 	auto dif = std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count();
@@ -51,21 +51,29 @@ void task5()
 	begin = std::chrono::steady_clock::now();
 	
 	// Performs MST clustering
-	std::vector<int> labels_mst = g.mst_cluster(2);
+	std::vector<int> labels_mst = g.mst_cluster(3);
 
 	end = std::chrono::steady_clock::now();
 	dif = std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count();
 
 	std::cout << "MST time    : " << dif << " [ms]" << std::endl;
+
+	for (int i = 0; i < g.get_n(); i++)
+		std::cout << labels_mst[i] << " ";
 }
 
 void task6()
 {
-	Dataset test("../data/rio_airbnb_listings.csv");
+	Dataset test("../data/compare_3clusters_300.csv");
 	
-	std::cout << test.get_n() << " " << test.get_d();
+	std::cout << test.get_n() << " " << test.get_d() << std::endl;
 
-	//Graph g(test, "standardize");
+	Graph g(test, "standardize");
+
+	std::vector<int> clusters = g.mst_cluster();
+
+	for (int i = 0; i < test.get_n(); i++)
+		std::cout << clusters[i] << " ";
 }
 
 

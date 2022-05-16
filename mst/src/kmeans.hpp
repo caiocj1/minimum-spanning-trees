@@ -9,6 +9,7 @@
 #include <string>
 #include <algorithm> // for count
 #include <vector>
+#include <unordered_map>
 
 using std::rand;
 using std::srand;
