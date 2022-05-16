@@ -272,7 +272,8 @@ std::vector<int> Graph::mst_cluster(int k)
 	for (int i = 0; i < edge_list.size() - 2 * k + 2; i++)
 	{
 		auto& [w, u, v] = edge_list[i];
-		components.unionClass(u, v);
+		if (!components.isSameClass(u, v))
+			components.unionClass(u, v);
 	}
 
 	// Fill and return result

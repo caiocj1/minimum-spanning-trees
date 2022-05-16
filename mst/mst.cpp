@@ -31,7 +31,7 @@ void task5()
 	// Imports sample dataset that consists in points
 	// taken from three gaussian distributions.
 	// Change to 600, 900, 1200, 1500 to get time dependance
-	Dataset compare("../data/compare_3clusters_600.csv");
+	Dataset compare("../data/compare_3clusters_300_separated.csv");
 	
 	// Measure time of k-means
 	auto begin = std::chrono::steady_clock::now();
@@ -64,56 +64,27 @@ void task5()
 
 void task6()
 {
-	Dataset test("../data/compare_3clusters_300.csv");
+	Dataset test("../data/compare_3clusters_300_separated.csv");
 	
 	std::cout << test.get_n() << " " << test.get_d() << std::endl;
 
 	Graph g(test, "standardize");
 
+	// Measure time of mst_clusters with no k
+	auto begin = std::chrono::steady_clock::now();
+
 	std::vector<int> clusters = g.mst_cluster();
 
-	for (int i = 0; i < test.get_n(); i++)
-		std::cout << clusters[i] << " ";
+	auto end = std::chrono::steady_clock::now();
+	auto dif = std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count();
+
+	std::cout << "MST cluster (no explicit k) time: " << dif << " [ms]" << std::endl;
 }
 
 
 
 int main()
 {
-	/*Graph g(5);
-
-	g.add_bi_edge(0, 1, 1.2);
-	g.add_bi_edge(0, 2, 2.4);
-	g.add_bi_edge(0, 3, 3.6);
-	g.add_bi_edge(1, 2, 1.1);
-	g.add_bi_edge(2, 3, 2.2);
-	g.add_bi_edge(1, 4, 3.3);
-	g.add_bi_edge(2, 4, 4.4);
-	g.add_bi_edge(3, 4, 5.5);
-
-	Graph g(3);
-
-	g.add_bi_edge(0, 1, 3.1);
-	g.add_bi_edge(0, 2, 5.2);
-	g.add_bi_edge(1, 2, 4.7);
-
-	std::cout << "Graph g:" << std::endl;
-	g.print();
-	std::cout << std::endl;
-
-	Graph* test = g.prim();
-	std::cout << "MST:" << std::endl;
-	test->print();
-	std::cout << std::endl;
-
-	std::cout << "Clusters:" << std::endl;
-	std::vector<int> clusters = test->mst_cluster(2);
-	for (int i = 0; i < g.get_n(); i++)
-		std::cout << clusters[i] << " ";
-	std::cout << std::endl;
-
-	delete test;*/
-
 	bool valid;
 	do
 	{
