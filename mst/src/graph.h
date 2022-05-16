@@ -3,6 +3,7 @@
 #include <tuple>
 #include <vector>
 #include "dataset.hpp"
+#include <mpi.h>
 
 typedef std::pair<int, double> edge;
 typedef std::tuple<double, int, int> bi_edge;
@@ -26,6 +27,10 @@ public:
 	static Graph* random_complete_graph(int n_);
 
 	Graph* prim();
+
+	Graph* master_parallel_prim();
+	static void slave_parallel_prim();
+
 	Graph* boruvska();
 	Graph* kruskal();
 

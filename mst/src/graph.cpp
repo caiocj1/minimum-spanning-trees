@@ -5,6 +5,7 @@
 #include <queue>
 #include <limits>
 #include <random>
+#include <algorithm>
 #include <assert.h>
 
 Graph::Graph(int n_)
@@ -104,6 +105,11 @@ Graph* Graph::random_complete_graph(int n_)
 	return g;
 }
 
+/**
+* Prim's algorithm to calculate MST.
+* 
+* @return: pointer to MST
+*/
 Graph* Graph::prim()
 {
 	Graph* mst = new Graph(n);
@@ -150,6 +156,173 @@ Graph* Graph::prim()
 	return mst;
 }
 
+/**
+* Master process version of the parallelized Prim's algorithm.
+* 
+* @return: pointer to MST
+*/
+Graph* Graph::master_parallel_prim(){
+	const int MASTER = 0;
+    int p;
+    MPI_Comm_size(MPI_COMM_WORLD, &p);
+    if(p < 2) return prim();
+    
+    Graph *mst = new Graph(n);
+    
+    // Define infinity
+	constexpr double inf = std::numeric_limits<double>::infinity();
+
+	// Declare priority queue
+	auto cmp = [](edge e1, edge e2) { return e1.second > e2.second; };
+	std::priority_queue<edge, std::vector<edge>, decltype(cmp)> q(cmp);
+
+    // Distribute vertices among processes
+    int m_load = n/p + n%p, s_load = n/p;
+    std::vector<int> buf = {m_load, s_load};
+    
+    MPI_Bcast(buf.data(), 2, MPI_INT, MASTER, MPI_COMM_WORLD);
+
+    // Auxiliary function
+    auto is_vertex_mine = [m_load, s_load](int v) {return v < m_load;};
+
+	// Auxiliary vectors
+	std::vector<double> key(m_load, inf);
+	std::vector<int> parent(m_load, -1);
+	std::vector<bool> inMST(m_load, false);
+	
+    // Prim algorithm: 
+    // Initialize by setting the root
+	q.push(std::make_pair(0, 0));
+	key[0] = 0;
+
+	// Algorithm's main loop: exactly n vertices must be added to the MST
+    for(int i = 0, u, num_edges; i < n; i++){
+        std::pair<double, int> mwoe;
+        while(!q.empty() && inMST[q.top().first]) q.pop();
+        mwoe = q.empty() ? std::make_pair(inf, -1) : 
+                            std::make_pair(q.top().second, q.top().first);
+        // Send out the local MWOE for scrutiny                            
+        MPI_Allreduce(&mwoe, &mwoe, 1, MPI_DOUBLE_INT, MPI_MINLOC, MPI_COMM_WORLD);
+        u = mwoe.second;
+        // If the global MWOE is mine, handle it
+        if(is_vertex_mine(u))
+            inMST[u] = true;
+        
+        // Master sends everyone the adj list of the new node
+        num_edges = adj[u].size();
+        MPI_Bcast(&num_edges, 1, MPI_INT, MASTER, MPI_COMM_WORLD);
+
+        std::vector<std::pair<double, int> > neighbors;
+        for(auto &[v, w] : adj[u]) neighbors.push_back(std::make_pair(w, v));
+        MPI_Bcast(neighbors.data(), num_edges, MPI_DOUBLE_INT, 0, MPI_COMM_WORLD);
+
+        // Every process incorporates the new node's edges info
+        for(auto &[w, v] : neighbors){
+            if(is_vertex_mine(v) && !inMST[v] && key[v] > w){
+                key[v] = w;
+                q.push(std::make_pair(v, w));
+                parent[v] = u;
+            }
+        }
+    }
+
+    std::vector<double> global_key(n);
+	std::vector<int> global_parent(n);
+
+    std::vector<int> recvcounts(p), displs(p);
+    for(int r = 0; r < p; r++) 
+        (recvcounts[r] = r ? s_load : m_load, displs[r] =  r ? displs[r-1] + recvcounts[r-1] : 0);
+    
+    MPI_Gatherv(key.data(), m_load, MPI_DOUBLE, 
+                global_key.data(), recvcounts.data(), displs.data(), MPI_DOUBLE, 
+                MASTER, MPI_COMM_WORLD);
+    MPI_Gatherv(parent.data(), m_load, MPI_INT, 
+                global_parent.data(), recvcounts.data(), displs.data(), MPI_INT, 
+                MASTER, MPI_COMM_WORLD);
+
+	for (int i = 1; i < n; i++)
+        mst->add_bi_edge(i, global_parent[i], global_key[i]);
+
+	return mst;
+}
+
+/**
+* Slave processes version of the parallelized Prim's algorithm.
+* 
+* @return: pointer to MST
+*/
+void Graph::slave_parallel_prim(){
+	const int MASTER = 0;
+    int p, rank;
+    MPI_Comm_size(MPI_COMM_WORLD, &p);
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    
+    MPI_Status status;
+    
+    // Define infinity
+	constexpr double inf = std::numeric_limits<double>::infinity();
+
+	// Declare priority queue
+	auto cmp = [](edge e1, edge e2) { return e1.second > e2.second; };
+	std::priority_queue<edge, std::vector<edge>, decltype(cmp)> q(cmp);
+
+    std::vector<int> buf(2);
+    MPI_Bcast(buf.data(), 2, MPI_INT, MASTER, MPI_COMM_WORLD);
+    int m_load = buf[0], s_load = buf[1], n = m_load + (p-1)*s_load;
+        
+	// Auxiliary vectors
+	std::vector<double> key(s_load, inf);
+	std::vector<int> parent(s_load, -1);
+	std::vector<bool> inMST(s_load, false);
+
+    // Auxiliary functions
+    auto is_vertex_mine = [m_load, rank, s_load](int v) {
+        return (m_load + (rank-1)*s_load <= v) && (v < m_load + rank*s_load);
+    };
+    auto vertex_to_index = [m_load, rank, s_load](int v) {return v - m_load - (rank-1)*s_load;};
+    auto index_to_vertex = [m_load, rank, s_load](int i) {return m_load + (rank-1)*s_load + i;};
+    
+    // Adjacency list of the newest node in the MST
+    std::set<edge> newest_adj;
+
+    // Prim algorithm: 
+    for(int i = 0, u, num_edges; i < n; i++){
+        std::pair<double, int> mwoe;
+        while(!q.empty() && inMST[vertex_to_index(q.top().first)]) q.pop();
+        mwoe = q.empty() ? std::make_pair(inf, -1) : 
+                            std::make_pair(q.top().second, q.top().first);
+        // Send out the local MWOE for scrutiny                            
+        MPI_Allreduce(&mwoe, &mwoe, 1, MPI_DOUBLE_INT, MPI_MINLOC, MPI_COMM_WORLD);
+        u = mwoe.second;
+        // If the global MWOE is mine, handle it
+        if(is_vertex_mine(u))
+            inMST[vertex_to_index(u)] = true;
+        
+        // Master sends everyone the adj list of the new node
+        MPI_Bcast(&num_edges, 1, MPI_INT, MASTER, MPI_COMM_WORLD);
+
+        std::vector<std::pair<double, int> > neighbors(num_edges);
+        MPI_Bcast(neighbors.data(), num_edges, MPI_DOUBLE_INT, 0, MPI_COMM_WORLD);
+
+        // Every process incorporates the new node's edges info
+        for(auto &[w, v] : neighbors){
+            if(is_vertex_mine(v) && !inMST[vertex_to_index(v)] && key[vertex_to_index(v)] > w){
+                key[vertex_to_index(v)] = w;
+                q.push(std::make_pair(v, w));
+                parent[vertex_to_index(v)] = u;
+            }
+        }
+    }
+
+    MPI_Gatherv(key.data(), s_load, MPI_DOUBLE, NULL, NULL, NULL, MPI_DOUBLE, MASTER, MPI_COMM_WORLD);
+    MPI_Gatherv(parent.data(), s_load, MPI_INT, NULL, NULL, NULL, MPI_INT, MASTER, MPI_COMM_WORLD);
+}
+
+/**
+* Kruskal's algorithm to calculate MST.
+* 
+* @return: pointer to MST
+*/
 Graph* Graph::kruskal(){
 	Graph* mst = new Graph(n);
 	
@@ -159,7 +332,7 @@ Graph* Graph::kruskal(){
 		for(auto &[v, w] : adj[i])
 			edge_list.push_back({w, v, i});
 		
-	sort(edge_list.begin(), edge_list.end());
+	std::sort(edge_list.begin(), edge_list.end());
 
 	UnionFind components(n);
 
