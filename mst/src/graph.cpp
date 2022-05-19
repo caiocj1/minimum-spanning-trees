@@ -98,7 +98,7 @@ Graph* Graph::random_complete_graph(int n_)
 			if (i == j)
 				continue;
 			double w = (rand() % 10) + 0.5;
-			g->adj[i].insert(std::make_pair(j, w));
+			g->add_bi_edge(i, j, w);
 		}
 	}
 
@@ -402,6 +402,241 @@ Graph* Graph::boruvska()
 	}
 
 	return mst;
+}
+
+/**
+* Master process version of the parallelized Boruvka's algorithm.
+* 
+* @return: pointer to MST
+*/
+Graph* Graph::master_parallel_boruvska(){
+    const int MASTER = 0;
+    int p; MPI_Comm_size(MPI_COMM_WORLD, &p);
+    if(p < 2) return boruvska();
+    
+    Graph *mst = new Graph(n);
+    
+	constexpr double inf = std::numeric_limits<double>::infinity();
+	auto cmp = [](edge e1, edge e2) { return e1.second > e2.second; };
+
+    // Distribute vertices among processes
+    int m_load = n/p + n%p, s_load = n/p;
+    std::vector<int> buf = {m_load, s_load};
+    MPI_Bcast(buf.data(), 2, MPI_INT, MASTER, MPI_COMM_WORLD);
+
+    // Auxiliary function
+    auto is_vertex_mine = [m_load, s_load](int v) {return v < m_load;};
+
+    // Scatter edges throughout processes
+    std::vector<int> sendbuf(n), recvbuf(m_load);
+    for(int i = 0; i < n; i++) sendbuf[i] = adj[i].size();
+    std::vector<int> sendcounts(p), displs(p);
+    for(int r = 0; r < p; r++) 
+        sendcounts[r] = r ? s_load : m_load, displs[r] = r ? displs[r-1] + sendcounts[r-1] : 0;
+    
+    MPI_Scatterv(sendbuf.data(), sendcounts.data(), displs.data(), MPI_INT, 
+                 recvbuf.data(), m_load, MPI_INT, MASTER, MPI_COMM_WORLD);
+
+    std::vector<edge> edge_sendbuf, 
+                      edge_recvbuf(std::accumulate(recvbuf.begin(), recvbuf.end(), 0));
+    for(int i = 0; i < n; i++) 
+        for(edge e : adj[i]) 
+            edge_sendbuf.push_back(e);
+
+    for(int r = 0; r < p; r++) 
+        sendcounts[r] = std::accumulate(sendbuf.begin()+displs[r], sendbuf.begin()+displs[r]+sendcounts[r], 0), 
+        displs[r] = r ? displs[r-1] + sendcounts[r-1] : 0;
+
+    MPI_Datatype mpi_edge; 
+    struct {int bl[2]; MPI_Aint dsp[2]; MPI_Datatype tp[2];} ts;
+    ts = {{1, 1}, {offsetof(edge, first), offsetof(edge, second)}, {MPI_INT, MPI_DOUBLE}};
+    MPI_Type_create_struct(2, ts.bl, ts.dsp, ts.tp, &mpi_edge);
+    MPI_Type_commit(&mpi_edge);
+    
+    MPI_Scatterv(edge_sendbuf.data(), sendcounts.data(), displs.data(), mpi_edge, 
+                 edge_recvbuf.data(), edge_recvbuf.size(), mpi_edge, MASTER, MPI_COMM_WORLD);
+
+    // Declare local array of adjacency lists
+    std::vector<std::vector<edge> > local_adj(m_load);
+    for(int i = 0, displs = 0; i < m_load; displs += recvbuf[i++]){
+        local_adj[i] = std::vector<edge>(edge_recvbuf.begin()+displs, edge_recvbuf.begin()+displs+recvbuf[i]);
+        std::sort(local_adj[i].begin(), local_adj[i].end(), cmp);
+    }
+
+    // Now every process has its local version of weight-sorted adjacency lists for each of its vertices
+
+    // Begin Boruvska's algorithm: initialize UFDS of connected components
+    UnionFind components(n);
+    
+    // build an array of MWOEs for each component
+    std::vector<bi_edge> mwoes(n), mwoes_buf(n);
+    
+    // new MPI type
+    MPI_Datatype mpi_bi_edge; 
+    ts = {{1, 2}, {0, sizeof(double)}, {MPI_DOUBLE, MPI_INT}};
+    MPI_Type_create_struct(2, ts.bl, ts.dsp, ts.tp, &mpi_bi_edge);
+    MPI_Type_commit(&mpi_bi_edge);
+
+    // new MPI operation to be used in MPI_Reduce()
+    MPI_Op mpi_bi_edge_minloc;
+    auto bi_edge_minloc = [] (void *invec, void *inoutvec, int *len, MPI_Datatype *datatype) {
+        auto in = static_cast<bi_edge *>(invec), inout = static_cast<bi_edge *>(inoutvec);
+        for(int i = 0; i < *len; i++)
+            if(std::get<0>(in[i]) < std::get<0>(inout[i]))
+                inout[i] = in[i];
+        return;
+    };
+    MPI_Op_create(bi_edge_minloc, true, &mpi_bi_edge_minloc);
+
+
+    while(components.getNumSets() > 1){
+        // Reset/fill the MWOE array with wildcard bi_edges
+        mwoes.assign(n, std::make_tuple<double, int, int>((double) inf, -1, -1));
+        mwoes_buf.assign(n, std::make_tuple<double, int, int>((double) inf, -1, -1));
+
+        // Search for MWOEs in each of its vertices' adjacency lists
+        for(int i = 0, u; i < local_adj.size(); i++){
+            u = i; //slave version: u = index_to_vertex[i]
+            // Find a candidate MWOE for the class of element u:
+
+            while(!local_adj[i].empty() && (components.isSameClass(u, local_adj[i].back().first) || 
+                  local_adj[i].back().second >= std::get<0>(mwoes[components.find(u)])))
+                local_adj[i].pop_back();
+            
+
+            if(local_adj[i].empty()) continue;
+            auto &[v, w] = local_adj[i].back();
+
+            mwoes[components.find(u)] = std::make_tuple(w, u, v);
+        }
+
+        // All processes put together their candidate MWOE's, get the global ones
+        MPI_Allreduce(mwoes.data(), mwoes_buf.data(), n, mpi_bi_edge, mpi_bi_edge_minloc, MPI_COMM_WORLD);
+        mwoes.swap(mwoes_buf);
+        // Update UFDS with the new mwoes
+        for(auto &[w, u, v] : mwoes)
+            if(w < inf && !components.isSameClass(u, v)) 
+                mst->add_bi_edge(u, v, w), components.unionClass(u, v);
+
+        mwoes.clear(); mwoes_buf.clear();
+    }
+    
+    MPI_Type_free(&mpi_edge);
+    MPI_Type_free(&mpi_bi_edge); 
+    MPI_Op_free(&mpi_bi_edge_minloc);
+    
+	return mst;
+}
+
+/**
+* Slave processes version of the parallelized Boruvka's algorithm.
+* 
+* @return: pointer to MST
+*/
+void Graph::slave_parallel_boruvska(){
+    const int MASTER = 0;
+    int p, rank;
+    MPI_Comm_size(MPI_COMM_WORLD, &p);
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+        
+    // Define infinity
+	constexpr double inf = std::numeric_limits<double>::infinity();
+	auto cmp = [](edge e1, edge e2) { return e1.second > e2.second; };
+	
+    std::vector<int> buf(2);
+    MPI_Bcast(buf.data(), 2, MPI_INT, MASTER, MPI_COMM_WORLD);
+    int m_load = buf[0], s_load = buf[1], n = m_load + (p-1)*s_load;
+        
+	// Auxiliary functions
+    auto is_vertex_mine = [m_load, rank, s_load](int v) {
+        return (m_load + (rank-1)*s_load <= v) && (v < m_load + rank*s_load);
+    };
+    auto vertex_to_index = [m_load, rank, s_load](int v) {return v - m_load - (rank-1)*s_load;};
+    auto index_to_vertex = [m_load, rank, s_load](int i) {return m_load + (rank-1)*s_load + i;};
+
+
+    // Scatter edges throughout processes
+    std::vector<int> recvbuf(s_load);
+    
+    MPI_Scatterv(NULL, NULL, NULL, MPI_INT, 
+                 recvbuf.data(), s_load, MPI_INT, MASTER, MPI_COMM_WORLD);
+
+    std::vector<edge> edge_recvbuf(std::accumulate(recvbuf.begin(), recvbuf.end(), 0));
+
+    MPI_Datatype mpi_edge; 
+    struct {int bl[2]; MPI_Aint dsp[2]; MPI_Datatype tp[2];} ts;
+    ts = {{1, 1}, {offsetof(edge, first), offsetof(edge, second)}, {MPI_INT, MPI_DOUBLE}};
+    MPI_Type_create_struct(2, ts.bl, ts.dsp, ts.tp, &mpi_edge);
+    MPI_Type_commit(&mpi_edge);
+    
+    MPI_Scatterv(NULL, NULL, NULL, mpi_edge, 
+                 edge_recvbuf.data(), edge_recvbuf.size(), mpi_edge, MASTER, MPI_COMM_WORLD);
+
+    // Declare local array of adjacency lists
+    std::vector<std::vector<edge> > local_adj(s_load);
+    for(int i = 0, displs = 0; i < s_load; displs += recvbuf[i++]){
+        local_adj[i] = std::vector<edge>(edge_recvbuf.begin()+displs, edge_recvbuf.begin()+displs+recvbuf[i]);
+        std::sort(local_adj[i].begin(), local_adj[i].end(), cmp);
+    }
+
+    // Now every process has its local version of weight-sorted adjacency lists for each of its vertices
+
+    // Begin Boruvska's algorithm: initialize UFDS of connected components
+    UnionFind components(n);
+    
+    // build an array of MWOEs for each component
+    std::vector<bi_edge> mwoes(n), mwoes_buf(n);
+    
+    // new MPI type
+    MPI_Datatype mpi_bi_edge; 
+    ts = {{1, 1}, {0, sizeof(double)}, {MPI_DOUBLE, MPI_2INT}};
+    MPI_Type_create_struct(2, ts.bl, ts.dsp, ts.tp, &mpi_bi_edge);
+    MPI_Type_commit(&mpi_bi_edge);
+
+    // new MPI operation to be used in MPI_Reduce()
+    MPI_Op mpi_bi_edge_minloc;
+    auto bi_edge_minloc = [] (void *invec, void *inoutvec, int *len, MPI_Datatype *datatype) {
+        auto in = static_cast<bi_edge *>(invec), inout = static_cast<bi_edge *>(inoutvec);
+        for(int i = 0; i < *len; i++)
+            if(std::get<0>(in[i]) < std::get<0>(inout[i]))
+                inout[i] = in[i];
+        return;
+    };
+    MPI_Op_create(bi_edge_minloc, true, &mpi_bi_edge_minloc);
+
+
+    while(components.getNumSets() > 1){
+        // Reset/fill the MWOE array with wildcard bi_edges
+        mwoes.assign(n, std::make_tuple<double, int, int>((double) inf, -1, -1));
+        mwoes_buf.assign(n, std::make_tuple<double, int, int>((double) inf, -1, -1));
+
+        // Search for MWOEs in each of its vertices' adjacency lists
+        for(int i = 0, u; i < local_adj.size(); i++){
+            u = index_to_vertex(i); 
+            // Find a candidate MWOE for the class of element u:
+            while(!local_adj[i].empty() && (components.isSameClass(u, local_adj[i].back().first) || 
+                  local_adj[i].back().second >= std::get<0>(mwoes[components.find(u)])))
+                local_adj[i].pop_back();
+            
+            if(local_adj[i].empty()) continue;
+            auto &[v, w] = local_adj[i].back();
+            mwoes[components.find(u)] = std::make_tuple(w, u, v);
+        }
+        
+        // All processes put together their candidate MWOE's, reduce to get the global ones
+        MPI_Allreduce(mwoes.data(), mwoes_buf.data(), n, mpi_bi_edge, mpi_bi_edge_minloc, MPI_COMM_WORLD);
+        mwoes.swap(mwoes_buf);
+
+        // Update UFDS with the new MWOEs
+        for(auto &[w, u, v] : mwoes)
+            if(w < inf && !components.isSameClass(u, v)) 
+                components.unionClass(u, v);
+
+    }
+
+    MPI_Type_free(&mpi_edge);
+    MPI_Type_free(&mpi_bi_edge); 
+    MPI_Op_free(&mpi_bi_edge_minloc);
 }
 
 /**

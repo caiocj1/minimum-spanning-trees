@@ -27,11 +27,13 @@ public:
 	static Graph* random_complete_graph(int n_);
 
 	Graph* prim();
-
 	Graph* master_parallel_prim();
 	static void slave_parallel_prim();
 
 	Graph* boruvska();
+	Graph* master_parallel_boruvska();
+	static void slave_parallel_boruvska();
+
 	Graph* kruskal();
 
 	std::vector<int> mst_cluster(int k);

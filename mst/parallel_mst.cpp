@@ -29,7 +29,7 @@ int main(int argc, char* argv[]) {
             graph->add_bi_edge(3, 4, 4);
             graph->add_bi_edge(4, 5, 5);
             //double start = MPI_Wtime();
-            mst = graph->master_parallel_prim();
+            mst = graph->master_parallel_boruvska();
             
             mst->print();
             delete graph; delete mst;
@@ -37,7 +37,7 @@ int main(int argc, char* argv[]) {
         }
         default:
         {
-            Graph::slave_parallel_prim();
+            Graph::slave_parallel_boruvska();
         }
     }
 
