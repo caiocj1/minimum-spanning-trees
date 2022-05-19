@@ -18,6 +18,7 @@ public:
 	~Graph();
 
 	int get_n();
+	int get_m();
 	std::set<edge>* get_adj();
 
 	void print();
@@ -25,6 +26,7 @@ public:
 	void add_bi_edge(int u, int v, double w);
 
 	static Graph* random_complete_graph(int n_);
+	static Graph* random_sparse_graph(int n_, int m_);
 
 	Graph* prim();
 	Graph* master_parallel_prim();

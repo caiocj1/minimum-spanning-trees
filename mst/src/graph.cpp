@@ -47,6 +47,11 @@ int Graph::get_n()
 	return n;
 }
 
+int Graph::get_m()
+{
+	return m;
+}
+
 void Graph::print()
 {
 	for (int i = 0; i < n; i++)
@@ -100,6 +105,30 @@ Graph* Graph::random_complete_graph(int n_)
 			double w = (rand() % 10) + 0.5;
 			g->add_bi_edge(i, j, w);
 		}
+	}
+
+	return g;
+}
+
+Graph* Graph::random_sparse_graph(int n_, int m_){
+	Graph* g = new Graph(n_);
+	UnionFind components(n_);
+
+	std::random_device rd;
+    std::mt19937 e2(rd());
+    std::uniform_real_distribution<> dist(n_, 2*n_);
+	
+	while(components.getNumSets() > 1){
+		int u = rand() % n_, v = rand() % n_;
+		while(components.isSameClass(u, v)) u = rand() % n_, v = rand() % n_;
+		g->add_bi_edge(u, v, dist(e2));
+		components.unionClass(u, v);
+	}
+	while(g->m < m_){
+		int u = rand() % n_, v = rand() % n_;
+		while(u == v) u = rand() % n_, v = rand() % n_;
+		g->add_bi_edge(u, v, dist(e2));
+		components.unionClass(u, v);
 	}
 
 	return g;

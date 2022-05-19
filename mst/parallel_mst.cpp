@@ -18,20 +18,20 @@ int main(int argc, char* argv[]) {
     switch(rank){
         case 0:
         {
-            Graph *graph = new Graph(6), *mst;
-            graph->add_bi_edge(0, 1, 1);
-            graph->add_bi_edge(0, 2, 3);
-            graph->add_bi_edge(0, 5, 3);
-            graph->add_bi_edge(1, 2, 5);
-            graph->add_bi_edge(1, 3, 1);
-            graph->add_bi_edge(2, 3, 2);
-            graph->add_bi_edge(2, 4, 1);
-            graph->add_bi_edge(3, 4, 4);
-            graph->add_bi_edge(4, 5, 5);
-            //double start = MPI_Wtime();
-            mst = graph->master_parallel_boruvska();
+            int n = 4 + 4*(rand() % 7), m = n * (rand() % n);
+            Graph *graph = Graph::random_sparse_graph(n, m), *mst;
             
+            std::cout << "Original graph: (n, m) = (" << n << ", " << m/2 << ") " << std::endl;
+            graph->print();
+
+            double start = MPI_Wtime();
+            mst = graph->master_parallel_boruvska();
+            double time = MPI_Wtime() - start;
+            
+            std::cout << "MST found: (n, m) = (" << mst->get_n() << ", " << mst->get_m()/2 << ") " << std::endl;
             mst->print();
+            std::cout << "Time elapsed: " << 1000*time << " ms" << std::endl;
+            
             delete graph; delete mst;
             break;
         }
