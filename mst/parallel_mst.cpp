@@ -18,25 +18,54 @@ int main(int argc, char* argv[]) {
     switch(rank){
         case 0:
         {
-            int n = 4 + 4*(rand() % 7), m = n * (rand() % n);
+            int n = argc > 1 ? atoi(argv[1]) : 400, m = n * (rand() % n);
             Graph *graph = Graph::random_sparse_graph(n, m), *mst;
-            
+            std::cout << "Running with " << size << " processes" << std::endl;
             std::cout << "Original graph: (n, m) = (" << n << ", " << m/2 << ") " << std::endl;
-            graph->print();
-
+            //graph->print(); 
+            ////////////////////////////
             double start = MPI_Wtime();
-            mst = graph->master_parallel_boruvska();
+            mst = graph->prim();
             double time = MPI_Wtime() - start;
             
-            std::cout << "MST found: (n, m) = (" << mst->get_n() << ", " << mst->get_m()/2 << ") " << std::endl;
-            mst->print();
+            std::cout << "MST found by sequential Prim: (n, m) = (" << mst->get_n() << ", " << mst->get_m()/2 << ") " << std::endl;
+            //mst->print(); 
+            delete mst;
             std::cout << "Time elapsed: " << 1000*time << " ms" << std::endl;
+            ////////////////////////////
+            start = MPI_Wtime();
+            mst = graph->master_parallel_prim();
+            time = MPI_Wtime() - start;
             
-            delete graph; delete mst;
+            std::cout << "MST found by parallel Prim: (n, m) = (" << mst->get_n() << ", " << mst->get_m()/2 << ") " << std::endl;
+            //mst->print(); 
+            delete mst;
+            std::cout << "Time elapsed: " << 1000*time << " ms" << std::endl;
+            ////////////////////////////
+            start = MPI_Wtime();
+            mst = graph->boruvska();
+            time = MPI_Wtime() - start;
+            
+            std::cout << "MST found by sequential Boruvka: (n, m) = (" << mst->get_n() << ", " << mst->get_m()/2 << ") " << std::endl;
+            //mst->print(); 
+            delete mst;
+            std::cout << "Time elapsed: " << 1000*time << " ms" << std::endl;
+            ////////////////////////////
+            start = MPI_Wtime();
+            mst = graph->master_parallel_boruvska();
+            time = MPI_Wtime() - start;
+            
+            std::cout << "MST found by parallel Boruvka: (n, m) = (" << mst->get_n() << ", " << mst->get_m()/2 << ") " << std::endl;
+            //mst->print(); 
+            delete mst;
+            std::cout << "Time elapsed: " << 1000*time << " ms" << std::endl;
+            ////////////////////////////
+            delete graph; 
             break;
         }
         default:
         {
+            Graph::slave_parallel_prim();
             Graph::slave_parallel_boruvska();
         }
     }
